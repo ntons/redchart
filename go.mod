@@ -1,4 +1,4 @@
-module github.com/ntons/leaderboard-go
+module github.com/ntons/rank-go
 
 go 1.13
 
