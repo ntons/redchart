@@ -32,37 +32,30 @@ func ScriptLoad(r Scripter) (err error) {
 }
 
 func newScript(src string) *redis.Script {
-	script := redis.NewScript(luaCommon + src)
+	script := redis.NewScript(fmt.Sprintf(luaTemplate, src))
 	scripts = append(scripts, script)
 	return script
 }
 
-var (
-	luaCommon = `
--- determine keys
+const (
+	luaTemplate = `
 local ZKEY, HKEY = KEYS[1]..":z", KEYS[1]..":h"
--- parse options
-if ARGV[1] ~= "" then
-	local o = cmsgpack.unpack(ARGV[1])
+local f = function() %s end
+local o = cmsgpack.unpack(table.remove(ARGV, 1))
+if o then
 	if o.construct_from and redis.call("EXISTS", ZKEY) == 0 and
-	    redis.call("EXISTS", o.construct_from..":z") == 1 then
+		redis.call("EXISTS", o.construct_from..":z") == 1 then
 		redis.call("ZUNIONSTORE", ZKEY, 1, o.construct_from..":z")
-		local hv = redis.call("HGETALL", o.construct_from..":h")
-		if #hv > 0 then redis.call("HMSET", HKEY, unpack(hv)) end
+		local v = redis.call("HGETALL", o.construct_from..":h")
+		if #v > 0 then redis.call("HMSET", HKEY, unpack(v)) end
 	end
-	if redis.call("EXISTS", ZKEY) == 0 then
-	    redis.call("ZADD", ZKEY, 0, "$DUMMY$")
-		redis.call("ZREM", ZKEY, "$DUMMY$")
-	end
-	if redis.call("EXISTS", HKEY) == 0 then
-	    redis.call("HSET", HKEY, "$DUMMY$", "$DUMMY$")
-	end
+	local r = f()
 	if o.capacity then
 		local size = redis.call("ZCARD", ZKEY)
 		if size > o.capacity then
-			local r = redis.call("ZPOPMIN", ZKEY, size - o.capacity)
+			local v = redis.call("ZPOPMIN", ZKEY, size - o.capacity)
 			local a = {}
-			for i=1,#r-1,2 do a[#a+1] = r[i] end
+			for i=1,#v-1,2 do a[#a+1] = v[i] end
 			redis.call("HDEL", HKEY, unpack(a))
 		end
 	end
@@ -76,9 +69,13 @@ if ARGV[1] ~= "" then
 		redis.call("PERSIST", ZKEY)
 		redis.call("PERSIST", HKEY)
 	end
-end
-table.remove(ARGV, 1)
-`
+	return r
+else
+	return f()
+end`
+)
+
+var (
 	luaTouch = newScript(``) // execute common only
 
 	luaRemoveId = newScript(`
@@ -92,10 +89,10 @@ if #es == 0 then return 0 end
 local za = {}
 local ha = {}
 for _, e in ipairs(es) do
-    za[#za+1], za[#za+2] = e.score, e.id
-    if e.info and e.info ~= "" then
-        ha[#ha+1], ha[#ha+2] = e.id, e.info
-    end
+	za[#za+1], za[#za+2] = e.score, e.id
+	if e.info and e.info ~= "" then
+		ha[#ha+1], ha[#ha+2] = e.id, e.info
+	end
 end
 if #ha > 0 then redis.call("HSET", HKEY, unpack(ha)) end
 return redis.call("ZADD", ZKEY, unpack(za))`)
@@ -106,9 +103,9 @@ if #es == 0 then return 0 end
 local a = {}
 local r = {}
 for i, e in ipairs(es) do
-    r[i] = tonumber(redis.call("ZADD", ZKEY, "INCR", e.score, e.id))
-    if e.info and e.info ~= "" then
-	    a[#a+1], a[#a+2] = e.id, e.info
+	r[i] = tonumber(redis.call("ZADD", ZKEY, "INCR", e.score, e.id))
+	if e.info and e.info ~= "" then
+		a[#a+1], a[#a+2] = e.id, e.info
 	end
 end
 if #a > 0 then redis.call("HSET", HKEY, unpack(a)) end
@@ -127,13 +124,13 @@ local r = redis.call("ZREVRANGE", ZKEY, ARGV[1], ARGV[2], "WITHSCORES")
 if #r == 0 then return cmsgpack.pack(es) end
 local a = {}
 for i=1,#r-1,2 do
-    es[#es + 1] = { ["id"] = r[i], ["score"] = tonumber(r[i+1]) }
-    a[#a + 1] = r[i]
+	es[#es + 1] = { ["id"] = r[i], ["score"] = tonumber(r[i+1]) }
+	a[#a + 1] = r[i]
 end
 local r = redis.call("HMGET", HKEY, unpack(a))
 for i=1,#r,1 do
-    es[i].rank = ARGV[1] + i - 1
-    if r[i] then es[i].info = r[i] end
+	es[i].rank = ARGV[1] + i - 1
+	if r[i] then es[i].info = r[i] end
 end
 return cmsgpack.pack(es)`)
 
@@ -157,12 +154,12 @@ local za = {}
 local ha = {}
 for _, e in ipairs(es) do
 	if not redis.call("ZSCORE", ZKEY, e.id) then
-	    n = n - 1
-        za[#za+1], za[#za+2] = n, e.id
-        if e.info and e.info ~= "" then
-		    ha[#ha+1], ha[#ha+2] = e.id, e.info
-        end
-    end
+		n = n - 1
+		za[#za+1], za[#za+2] = n, e.id
+		if e.info and e.info ~= "" then
+			ha[#ha+1], ha[#ha+2] = e.id, e.info
+		end
+	end
 end
 if #za == 0 then return 0 end
 if #ha > 0 then redis.call("HSET", HKEY, unpack(ha)) end
