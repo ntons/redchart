@@ -1,4 +1,4 @@
-package rank
+package ranking
 
 import (
 	"encoding/json"
