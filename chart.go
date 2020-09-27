@@ -12,7 +12,7 @@ type RedisClient interface {
 }
 
 type Entry struct {
-	Rank  int    `json:"rank" msgpack:"rank"`
+	Rank  int32  `json:"rank" msgpack:"rank"`
 	Id    string `json:"id" msgpack:"id"`
 	Info  string `json:"info" msgpack:"info"`
 	Score int64  `json:"score" msgpack:"score"`
@@ -41,7 +41,7 @@ func (x chart) Touch(ctx context.Context) (err error) {
 
 // get entries by range
 func (x chart) GetRange(
-	ctx context.Context, offset, count int) (entries []*Entry, err error) {
+	ctx context.Context, offset, count int32) (entries []*Entry, err error) {
 	s, err := x.runScript(ctx, luaGetRange, offset, offset+count-1).Text()
 	if err != nil {
 		return

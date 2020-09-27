@@ -9,7 +9,7 @@ import (
 
 type options struct {
 	// capacity of chart
-	Capacity int `msgpack:"capacity,omitempty"`
+	Capacity int32 `msgpack:"capacity,omitempty"`
 	// duplicate from name IF NOT EXIST
 	ConstructFrom string `msgpack:"construct_from,omitempty"`
 	// only one of ExpireAt and IdleExpire should be specified,
@@ -41,7 +41,7 @@ func (f funcOption) apply(o *options) {
 	f.fn(o)
 }
 
-func WithCapacity(capacity int) Option {
+func WithCapacity(capacity int32) Option {
 	return funcOption{func(o *options) { o.Capacity = capacity }}
 }
 func ConstructFrom(name string) Option {

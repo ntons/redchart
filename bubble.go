@@ -32,6 +32,6 @@ func (x Bubble) SwapById(ctx context.Context, id1, id2 string) (err error) {
 }
 
 // swap 2 entries by rank
-func (x Bubble) SwapByRank(ctx context.Context, rank1, rank2 int) (err error) {
+func (x Bubble) SwapByRank(ctx context.Context, rank1, rank2 int32) (err error) {
 	return x.runScript(ctx, luaSwapByRank, rank1, rank2).Err()
 }
