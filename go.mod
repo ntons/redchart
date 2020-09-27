@@ -3,8 +3,8 @@ module github.com/ntons/ranking-go
 go 1.13
 
 require (
-	github.com/go-redis/redis/v7 v7.2.0
-	github.com/ntons/tongo v0.0.0-20200426044323-4b75a2eed06c
+	github.com/go-redis/redis/v7 v7.4.0
+	github.com/go-redis/redis/v8 v8.2.2
 	github.com/vmihailenco/msgpack/v4 v4.3.11
-	go.mongodb.org/mongo-driver v1.3.3 // indirect
+	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )

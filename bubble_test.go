@@ -6,19 +6,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 )
 
-func TestVector(t *testing.T) {
+func TestBubble(t *testing.T) {
+	ctx := context.Background()
+
 	client := redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"})
-	err := ScriptLoad(client)
+	err := LoadScripts(ctx, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ctx := context.Background()
-
-	vec := GetVector(client, "vector", &Options{
+	vec := GetBubble(client, "bubble", &Options{
 		Capacity:   5,
 		ExpireAt:   time.Now().Add(time.Minute),
 		IdleExpire: 10 * time.Second,

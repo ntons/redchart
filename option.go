@@ -1,44 +1,67 @@
 package ranking
 
 import (
-	"strconv"
+	"fmt"
 	"time"
 
 	"github.com/vmihailenco/msgpack/v4"
 )
 
-type Options struct {
-	Capacity int
+type options struct {
+	// capacity of chart
+	Capacity int `msgpack:"capacity,omitempty"`
 	// duplicate from name IF NOT EXIST
-	ConstructFrom string
+	ConstructFrom string `msgpack:"construct_from,omitempty"`
 	// only one of ExpireAt and IdleExpire should be specified,
 	// If both were set, ExpireAt was prefered
-	ExpireAt   time.Time
-	IdleExpire time.Duration
+	ExpireAt   string `msgpack:"expire_at,omitempty"`
+	IdleExpire string `msgpack:"idle_expire,omitempty"`
 }
 
-func (o *Options) encode() string {
+func (o *options) encode() string {
 	if o == nil {
 		return ""
 	}
-	s := struct {
-		Capacity      int    `msgpack:"capacity,omitempty"`
-		ConstructFrom string `msgpack:"construct_from,omitempty"`
-		ExpireAt      string `msgpack:"expire_at,omitempty"`
-		IdleExpire    string `msgpack:"idle_expire,omitempty"`
-	}{
-		Capacity:      o.Capacity,
-		ConstructFrom: o.ConstructFrom,
-	}
-	if !o.ExpireAt.IsZero() {
-		s.ExpireAt = strconv.Itoa(int(o.ExpireAt.UnixNano() / 1e6))
-	}
-	if o.IdleExpire > 0 {
-		s.IdleExpire = strconv.Itoa(int(o.IdleExpire / 1e6))
-	}
-	if b, err := msgpack.Marshal(&s); err != nil {
+	if b, err := msgpack.Marshal(o); err != nil {
 		panic(err)
 	} else {
 		return string(b)
 	}
+}
+
+type Option interface {
+	apply(o *options)
+}
+
+type funcOption struct {
+	fn func(o *options)
+}
+
+func (f funcOption) apply(o *options) {
+	f.fn(o)
+}
+
+func WithCapacity(capacity int) Option {
+	return funcOption{func(o *options) { o.Capacity = capacity }}
+}
+func ConstructFrom(name string) Option {
+	return funcOption{func(o *options) { o.ConstructFrom = name }}
+}
+func ExpireAt(t time.Time) Option {
+	return funcOption{func(o *options) {
+		if t.IsZero() {
+			o.ExpireAt = ""
+		} else {
+			o.ExpireAt = fmt.Sprintf("%d", t.UnixNano()/1e6)
+		}
+	}}
+}
+func IdleExpire(d time.Duration) Option {
+	return funcOption{func(o *options) {
+		if d == 0 {
+			o.IdleExpire = ""
+		} else {
+			o.IdleExpire = fmt.Sprintf("%d", d/time.Millisecond)
+		}
+	}}
 }

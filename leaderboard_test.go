@@ -6,17 +6,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 )
 
 func TestLeaderboard(t *testing.T) {
+	ctx := context.Background()
+
 	client := redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"})
-	err := ScriptLoad(client)
+	err := LoadScripts(ctx, client)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	ctx := context.Background()
 
 	lb := GetLeaderboard(client, "leaderboard", &Options{
 		Capacity: 5,

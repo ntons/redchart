@@ -1,42 +1,5 @@
 package ranking
 
-import (
-	"context"
-	"fmt"
-
-	"github.com/go-redis/redis/v7"
-)
-
-type Scripter interface {
-	Eval(script string, keys []string, args ...interface{}) *redis.Cmd
-	EvalSha(sha1 string, keys []string, args ...interface{}) *redis.Cmd
-	ScriptExists(hashes ...string) *redis.BoolSliceCmd
-	ScriptLoad(script string) *redis.StringCmd
-}
-
-type Client interface {
-	Scripter
-	ProcessContext(context.Context, redis.Cmder) error
-}
-
-var scripts []*redis.Script
-
-func ScriptLoad(r Scripter) (err error) {
-	for _, script := range scripts {
-		if _, err = script.Load(r).Result(); err != nil {
-			fmt.Println(script)
-			return
-		}
-	}
-	return
-}
-
-func newScript(src string) *redis.Script {
-	script := redis.NewScript(fmt.Sprintf(luaTemplate, src))
-	scripts = append(scripts, script)
-	return script
-}
-
 const (
 	luaTemplate = `
 local ZKEY, HKEY = KEYS[1]..":z", KEYS[1]..":h"
@@ -76,7 +39,7 @@ end`
 )
 
 var (
-	luaTouch = newScript(``) // execute common only
+	luaTouch = newScript(``)
 
 	luaRemoveId = newScript(`
 redis.call("HDEL", HKEY, unpack(ARGV))
@@ -143,7 +106,7 @@ e.info = redis.call("HGET", HKEY, ARGV[1])
 if not e.info then e.info = nil end
 return cmsgpack.pack(e)`)
 
-	// vector
+	// bubble
 	luaAppend = newScript(`
 local es = cmsgpack.unpack(ARGV[1])
 if #es == 0 then return 0 end
