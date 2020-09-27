@@ -1,4 +1,4 @@
-module github.com/ntons/rank-go
+module github.com/ntons/ranking-go
 
 go 1.13
 
