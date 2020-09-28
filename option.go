@@ -44,10 +44,10 @@ func (f funcOption) apply(o *options) {
 func WithCapacity(capacity int32) Option {
 	return funcOption{func(o *options) { o.Capacity = capacity }}
 }
-func ConstructFrom(name string) Option {
+func WithConstructFrom(name string) Option {
 	return funcOption{func(o *options) { o.ConstructFrom = name }}
 }
-func ExpireAt(t time.Time) Option {
+func WithExpireAt(t time.Time) Option {
 	return funcOption{func(o *options) {
 		if t.IsZero() {
 			o.ExpireAt = ""
@@ -56,7 +56,7 @@ func ExpireAt(t time.Time) Option {
 		}
 	}}
 }
-func IdleExpire(d time.Duration) Option {
+func WithIdleExpire(d time.Duration) Option {
 	return funcOption{func(o *options) {
 		if d == 0 {
 			o.IdleExpire = ""

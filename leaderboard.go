@@ -27,7 +27,7 @@ func (x Leaderboard) SetScore(
 
 // update score by increment, e.Rank will be ignored
 // e.Score will be set to updated value if success
-func (x Leaderboard) IncScore(
+func (x Leaderboard) IncrScore(
 	ctx context.Context, entries ...*Entry) (err error) {
 	b, err := msgpack.Marshal(entries)
 	if err != nil {

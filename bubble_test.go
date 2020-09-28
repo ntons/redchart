@@ -3,6 +3,7 @@ package ranking
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -10,59 +11,65 @@ import (
 )
 
 func TestBubble(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+
 	ctx := context.Background()
 
-	client := redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"})
-	err := LoadScripts(ctx, client)
+	cli := redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"})
+	err := LoadScripts(ctx, cli)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	vec := GetBubble(client, "bubble", &Options{
-		Capacity:   5,
-		ExpireAt:   time.Now().Add(time.Minute),
-		IdleExpire: 10 * time.Second,
-	})
-	if err = vec.Append(ctx,
-		&E{Id: "id1"},
-		&E{Id: "id2"},
-		&E{Id: "id3"},
-		&E{Id: "id4"},
-		&E{Id: "id5"},
-		&E{Id: "id6"},
-		&E{Id: "id7"},
-		&E{Id: "id8"},
-	); err != nil {
-		t.Log(luaSetScore)
+	const N = 100
+
+	e1 := make([]*E, N)
+	for i := 0; i < N; i++ {
+		e1[i] = &E{Id: fmt.Sprintf("%d", i)}
+	}
+
+	cli.Del(ctx, "bubbletest:z", "bubbletest:h")
+	x := GetBubble(cli, "bubbletest", WithIdleExpire(time.Minute))
+
+	if err = x.Append(ctx, e1...); err != nil {
+		t.Fatal(err)
+	}
+	e2, err := x.GetRange(ctx, 0, N)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(e2) != N {
+		t.Fatalf("unexpected len: %d", len(e2))
+	}
+	for i := 0; i < len(e2); i++ {
+		if e1[i].Id != e2[i].Id {
+			t.Fatalf("unexpected id: %s", e2[i].Id)
+		}
+	}
+
+	for i := 0; i < N; i++ {
+		u := rand.Int31n(N)
+		v := rand.Int31n(N)
+		if rand.Int31n(2) == 0 {
+			x.SwapById(ctx, e1[u].Id, e1[v].Id)
+		} else {
+			x.SwapByRank(ctx, u, v)
+		}
+		e1[u], e1[v] = e1[v], e1[u]
+	}
+
+	e3, err := x.GetRange(ctx, 0, N)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if r, err := vec.GetRange(ctx, 0, 10); err != nil {
-		t.Log(luaGetRange)
-		t.Fatal(err)
-	} else {
-		fmt.Println(r)
+	if len(e3) != N {
+		t.Fatalf("unexpected len: %d", len(e3))
+	}
+	for i := 0; i < len(e3); i++ {
+		if e1[i].Id != e3[i].Id {
+			t.Fatalf("unexpected id: %s", e3[i].Id)
+		}
 	}
 
-	if err := vec.SwapById(ctx, "id1", "id3"); err != nil {
-		t.Fatal(err)
-	}
-
-	if r, err := vec.GetRange(ctx, 0, 10); err != nil {
-		t.Log(luaGetRange)
-		t.Fatal(err)
-	} else {
-		fmt.Println(r)
-	}
-
-	if e, err := vec.GetById(ctx, "id1"); err != nil {
-		t.Fatal(err)
-	} else {
-		fmt.Println(e)
-	}
-	if e, err := vec.GetById(ctx, "id6"); err != nil {
-		t.Fatal(err)
-	} else {
-		fmt.Println(e)
-	}
 }

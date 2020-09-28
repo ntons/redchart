@@ -38,14 +38,17 @@ else
 end`
 )
 
+// assume that, N elements in chart, M elements to work out
 var (
 	luaTouch = newScript(``)
 
+	// O(M*log(N))
 	luaRemoveId = newScript(`
 redis.call("HDEL", HKEY, unpack(ARGV))
 return redis.call("ZREM", ZKEY, unpack(ARGV))`)
 
 	/// leaderboard
+	// O(M*log(N))
 	luaSetScore = newScript(`
 local es = cmsgpack.unpack(ARGV[1])
 if #es == 0 then return 0 end
@@ -60,6 +63,7 @@ end
 if #ha > 0 then redis.call("HSET", HKEY, unpack(ha)) end
 return redis.call("ZADD", ZKEY, unpack(za))`)
 
+	// O(M*log(N))
 	luaIncScore = newScript(`
 local es = cmsgpack.unpack(ARGV[1])
 if #es == 0 then return 0 end
@@ -74,6 +78,7 @@ end
 if #a > 0 then redis.call("HSET", HKEY, unpack(a)) end
 return cmsgpack.pack(r)`)
 
+	// O(M)
 	luaSetInfo = newScript(`
 local es = cmsgpack.unpack(ARGV[1])
 if #es == 0 then return 0 end
@@ -81,6 +86,7 @@ local a = {}
 for _, e in ipairs(es) do a[#a+1], a[#a+2] = e.id, e.info end
 return redis.call("HSET", HKEY, unpack(a))`)
 
+	// O(log(N)+M)
 	luaGetRange = newScript(`
 local es = {}
 local r = redis.call("ZREVRANGE", ZKEY, ARGV[1], ARGV[2], "WITHSCORES")
@@ -97,16 +103,23 @@ for i=1,#r,1 do
 end
 return cmsgpack.pack(es)`)
 
+	// O(M*log(N))
 	luaGetById = newScript(`
-local e = { ["id"] = ARGV[1] }
-e.rank = redis.call("ZREVRANK", ZKEY, ARGV[1])
-if not e.rank then return nil end
-e.score = assert(tonumber(redis.call("ZSCORE", ZKEY, ARGV[1])))
-e.info = redis.call("HGET", HKEY, ARGV[1])
-if not e.info then e.info = nil end
-return cmsgpack.pack(e)`)
+local es = {}
+for _, id in ipairs(ARGV) do
+	local e = { ["id"] = id }
+	e.rank = redis.call("ZREVRANK", ZKEY, id)
+	if e.rank then
+		e.score = assert(tonumber(redis.call("ZSCORE", ZKEY, id)))
+		e.info = redis.call("HGET", HKEY, id)
+		if not e.info then e.info = nil end
+		es[#es+1] = e
+	end
+end
+return cmsgpack.pack(es)`)
 
 	// bubble
+	// O(M*log(N))
 	luaAppend = newScript(`
 local es = cmsgpack.unpack(ARGV[1])
 if #es == 0 then return 0 end
@@ -128,6 +141,7 @@ if #za == 0 then return 0 end
 if #ha > 0 then redis.call("HSET", HKEY, unpack(ha)) end
 return redis.call("ZADD", ZKEY, unpack(za))`)
 
+	// O(log(N))
 	luaSwapById = newScript(`
 local s1 = redis.call("ZSCORE", ZKEY, ARGV[1])
 local s2 = redis.call("ZSCORE", ZKEY, ARGV[2])
@@ -136,10 +150,11 @@ if s1 and not s2 then return redis.call("ZADD", ZKEY, s1, ARGV[2]) end
 if not s1 and s2 then return redis.call("ZADD", ZKEY, s2, ARGV[1]) end
 return redis.call("ZADD", ZKEY, s2, ARGV[1], s1, ARGV[2])`)
 
+	// O(log(N))
 	luaSwapByRank = newScript(`
 local r1 = redis.call("ZREVRANGE", ZKEY, ARGV[1], ARGV[1], "WITHSCORES")
-if not s1 then error('rank "' .. ARGV[1] .. '" not found') end
+if not r1 then error('rank "' .. ARGV[1] .. '" not found') end
 local r2 = redis.call("ZREVRANGE", ZKEY, ARGV[2], ARGV[2], "WITHSCORES")
-if not s1 then error('rank "' .. ARGV[2] .. '" not found') end
+if not r1 then error('rank "' .. ARGV[2] .. '" not found') end
 return redis.call("ZADD", ZKEY, r2[2], r1[1], r1[2], r2[1])`)
 )

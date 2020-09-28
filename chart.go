@@ -2,6 +2,7 @@ package ranking
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/vmihailenco/msgpack/v4"
@@ -16,6 +17,10 @@ type Entry struct {
 	Id    string `json:"id" msgpack:"id"`
 	Info  string `json:"info" msgpack:"info"`
 	Score int64  `json:"score" msgpack:"score"`
+}
+
+func (e Entry) String() string {
+	return fmt.Sprintf("%v,%v,%v", e.Rank, e.Id, e.Score)
 }
 
 type E = Entry
@@ -53,16 +58,16 @@ func (x chart) GetRange(
 }
 
 // get entry by id
-func (x chart) GetById(ctx context.Context, id string) (e *Entry, err error) {
-	s, err := x.runScript(ctx, luaGetById, id).Text()
+func (x chart) GetById(
+	ctx context.Context, ids ...string) (entries []*Entry, err error) {
+	s, err := x.runScriptString(ctx, luaGetById, ids...).Text()
 	if err != nil {
 		if err == redis.Nil {
 			err = nil
 		}
 		return
 	}
-	e = &Entry{}
-	if err = msgpack.Unmarshal(s2b(s), e); err != nil {
+	if err = msgpack.Unmarshal(s2b(s), &entries); err != nil {
 		return
 	}
 	return
