@@ -13,6 +13,6 @@ func (c Client) GetLeaderboard(name string, opts ...Option) Leaderboard {
 	return GetLeaderboard(c.client, name, append(c.opts, opts...)...)
 }
 
-func (c Client) GetBubble(name string, opts ...Option) Bubble {
-	return GetBubble(c.client, name, append(c.opts, opts...)...)
+func (c Client) GetBubbleChart(name string, opts ...Option) BubbleChart {
+	return GetBubbleChart(c.client, name, append(c.opts, opts...)...)
 }
