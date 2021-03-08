@@ -8,10 +8,6 @@ import (
 	"github.com/vmihailenco/msgpack/v4"
 )
 
-type RedisClient interface {
-	scripter
-}
-
 type Entry struct {
 	Rank  int32  `json:"rank" msgpack:"rank"`
 	Id    string `json:"id" msgpack:"id"`
@@ -96,13 +92,13 @@ func (x chart) SetInfo(ctx context.Context, entries ...*Entry) (err error) {
 // i don't think you should remove entry by range
 
 func (x chart) runScript(
-	ctx context.Context, script *Script, args ...interface{}) *redis.Cmd {
+	ctx context.Context, script *script, args ...interface{}) *redis.Cmd {
 	args = append([]interface{}{x.opts}, args...)
 	return script.Run(ctx, x.client, []string{x.name}, args...)
 }
 
 func (x chart) runScriptString(
-	ctx context.Context, script *Script, args ...string) *redis.Cmd {
+	ctx context.Context, script *script, args ...string) *redis.Cmd {
 	tmp := make([]interface{}, 0, len(args))
 	for _, arg := range args {
 		tmp = append(tmp, arg)

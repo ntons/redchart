@@ -4,110 +4,46 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
-	"fmt"
 	"io"
-	"math/rand"
 	"strings"
+	"sync"
 
 	"github.com/go-redis/redis/v8"
 )
 
-type scripter interface {
-	Eval(ctx context.Context, script string, keys []string, args ...interface{}) *redis.Cmd
+type RedisClient interface {
 	EvalSha(ctx context.Context, sha1 string, keys []string, args ...interface{}) *redis.Cmd
-	ScriptExists(ctx context.Context, hashes ...string) *redis.BoolSliceCmd
 	ScriptLoad(ctx context.Context, script string) *redis.StringCmd
 }
 
-type ScriptOption interface {
-	apply(*Script)
+type script struct {
+	src, hash string
+	// mutex for loading
+	mu sync.Mutex
 }
 
-type funcScriptOption struct {
-	fn func(*Script)
-}
-
-func (o funcScriptOption) apply(s *Script) {
-	o.fn(s)
-}
-
-func WithTryShaProb(prob int) ScriptOption {
-	return funcScriptOption{func(s *Script) { s.tryShaProb = prob }}
-}
-
-// scripts create by remon.NewScript
-var scripts []*Script
-
-// load all scripts to redis
-// NewScript must be invoked before LoadScripts
-func LoadScripts(ctx context.Context, c scripter) (err error) {
-	for _, s := range scripts {
-		if _, err = s.Load(ctx, c).Result(); err != nil {
-			return
-		}
-	}
-	return
-}
-
-// Script is similar to redis.Script, but optimize evalsha strategy
-type Script struct {
-	src        string
-	hash       string
-	loaded     bool // is script loaded
-	tryShaProb int  // trySha probability 1/n
-}
-
-func newScript(src string, opts ...ScriptOption) *Script {
-	src = fmt.Sprintf(luaTemplate, src)
+func newScript(src string) *script {
 	h := sha1.New()
 	_, _ = io.WriteString(h, src)
-	s := &Script{
-		src:        src,
-		hash:       hex.EncodeToString(h.Sum(nil)),
-		loaded:     true,
-		tryShaProb: 100, // 1% by default
+	return &script{src: src, hash: hex.EncodeToString(h.Sum(nil))}
+}
+
+func (script *script) Run(ctx context.Context, cli RedisClient, keys []string, args ...interface{}) (r *redis.Cmd) {
+	isNoScript := func(err error) bool {
+		return err != nil && strings.HasPrefix(err.Error(), "NOSCRIPT ")
 	}
-	for _, opt := range opts {
-		opt.apply(s)
+	if r = cli.EvalSha(ctx, script.hash, keys, args...); !isNoScript(r.Err()) {
+		return
 	}
-	scripts = append(scripts, s)
-	return s
-}
-
-func (s *Script) Hash() string {
-	return s.hash
-}
-
-func (s *Script) Load(ctx context.Context, c scripter) *redis.StringCmd {
-	return c.ScriptLoad(ctx, s.src)
-}
-
-func (s *Script) Exists(ctx context.Context, c scripter) *redis.BoolSliceCmd {
-	return c.ScriptExists(ctx, s.hash)
-}
-
-func (s *Script) Eval(ctx context.Context, c scripter, keys []string, args ...interface{}) *redis.Cmd {
-	return c.Eval(ctx, s.src, keys, args...)
-}
-
-func (s *Script) EvalSha(ctx context.Context, c scripter, keys []string, args ...interface{}) *redis.Cmd {
-	return c.EvalSha(ctx, s.hash, keys, args...)
-}
-
-func (s *Script) Run(ctx context.Context, c scripter, keys []string, args ...interface{}) *redis.Cmd {
-	if !s.loaded {
-		s.loaded = s.trySha()
+	script.mu.Lock()
+	if r = cli.EvalSha(ctx, script.hash, keys, args...); !isNoScript(r.Err()) {
+		script.mu.Unlock()
+		return
 	}
-	if s.loaded {
-		r := s.EvalSha(ctx, c, keys, args...)
-		if err := r.Err(); err == nil || !strings.HasPrefix(err.Error(), "NOSCRIPT ") {
-			return r
-		}
-		s.loaded = false
+	if cli.ScriptLoad(ctx, script.src).Err() != nil {
+		script.mu.Unlock()
+		return
 	}
-	return s.Eval(ctx, c, keys, args...)
-}
-
-func (s *Script) trySha() bool {
-	return rand.Intn(100) == 0
+	script.mu.Unlock()
+	return cli.EvalSha(ctx, script.hash, keys, args...)
 }
