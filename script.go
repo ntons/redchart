@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -23,6 +24,7 @@ type script struct {
 }
 
 func newScript(src string) *script {
+	src = fmt.Sprintf(luaTemplate, src)
 	h := sha1.New()
 	_, _ = io.WriteString(h, src)
 	return &script{src: src, hash: hex.EncodeToString(h.Sum(nil))}
