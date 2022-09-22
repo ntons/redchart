@@ -48,8 +48,24 @@ redis.call("HDEL", HKEY, unpack(ARGV))
 return redis.call("ZREM", ZKEY, unpack(ARGV))`)
 
 	/// leaderboard
+
 	// O(M*log(N))
-	luaSetScore = newScript(`
+	luaAdd = newScript(`
+local es = cmsgpack.unpack(ARGV[1])
+if #es == 0 then return 0 end
+local za = {}
+local ha = {}
+for _, e in ipairs(es) do
+	za[#za+1], za[#za+2] = e.score, e.id
+	if e.info and e.info ~= "" then
+		ha[#ha+1], ha[#ha+2] = e.id, e.info
+	end
+end
+if #ha > 0 then redis.call("HSET", HKEY, unpack(ha)) end
+return redis.call("ZADD", ZKEY, "NX" unpack(za))`)
+
+	// O(M*log(N))
+	luaSet = newScript(`
 local es = cmsgpack.unpack(ARGV[1])
 if #es == 0 then return 0 end
 local za = {}
@@ -64,7 +80,7 @@ if #ha > 0 then redis.call("HSET", HKEY, unpack(ha)) end
 return redis.call("ZADD", ZKEY, unpack(za))`)
 
 	// O(M*log(N))
-	luaIncScore = newScript(`
+	luaIncr = newScript(`
 local es = cmsgpack.unpack(ARGV[1])
 if #es == 0 then return 0 end
 local a = {}
