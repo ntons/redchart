@@ -3,6 +3,7 @@ package ranking
 import (
 	"context"
 
+	"github.com/ntons/redis"
 	"github.com/vmihailenco/msgpack/v4"
 )
 
@@ -10,7 +11,7 @@ type BubbleChart struct {
 	chart
 }
 
-func GetBubbleChart(r RedisClient, name string, opts ...Option) BubbleChart {
+func GetBubbleChart(r redis.Client, name string, opts ...Option) BubbleChart {
 	return BubbleChart{getChart(r, name, opts...)}
 }
 

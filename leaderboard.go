@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ntons/redis"
 	"github.com/vmihailenco/msgpack/v4"
 )
 
@@ -11,7 +12,7 @@ type Leaderboard struct {
 	chart
 }
 
-func GetLeaderboard(r RedisClient, name string, opts ...Option) Leaderboard {
+func GetLeaderboard(r redis.Client, name string, opts ...Option) Leaderboard {
 	return Leaderboard{getChart(r, name, opts...)}
 }
 
@@ -58,4 +59,28 @@ func (x Leaderboard) Incr(
 		entries[i].Score = int64(v)
 	}
 	return
+}
+
+type RandByScoreArg struct {
+	Min   int64 `json:"min" msgpack:"min"`
+	Max   int64 `json:"max" msgpack:"max"`
+	Count int   `json:"count" msgpack:"count"`
+}
+
+// get entries randomly by score
+func (x Leaderboard) RandByScore(
+	ctx context.Context, args ...RandByScoreArg) (entries []*Entry, err error) {
+	b, err := msgpack.Marshal(args)
+	if err != nil {
+		return
+	}
+	s, err := x.runScript(ctx, luaRandByScore, b2s(b)).Text()
+	if err != nil {
+		return
+	}
+	var ids []string
+	if err = msgpack.Unmarshal(s2b(s), &ids); err != nil {
+		return
+	}
+	return x.GetById(ctx, ids...)
 }

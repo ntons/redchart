@@ -1,5 +1,11 @@
 package ranking
 
+import "github.com/ntons/redis"
+
+func newScript(src string) *redis.Script {
+	return redis.NewScript(luaTemplate, src)
+}
+
 const (
 	luaTemplate = `
 local ZKEY, HKEY = KEYS[1]..":z", KEYS[1]..":h"
@@ -62,7 +68,7 @@ for _, e in ipairs(es) do
 	end
 end
 if #ha > 0 then redis.call("HSET", HKEY, unpack(ha)) end
-return redis.call("ZADD", ZKEY, "NX" unpack(za))`)
+return redis.call("ZADD", ZKEY, "NX", unpack(za))`)
 
 	// O(M*log(N))
 	luaSet = newScript(`
@@ -92,6 +98,32 @@ for i, e in ipairs(es) do
 	end
 end
 if #a > 0 then redis.call("HSET", HKEY, unpack(a)) end
+return cmsgpack.pack(r)`)
+
+	//
+	luaRandByScore = newScript(`
+local r = {}
+for i, a in ipairs(cmsgpack.unpack(ARGV[1])) do
+    local min_id = redis.call("ZRANGEBYSCORE", ZKEY, a.min, a.max, "LIMIT", 0, 1)
+	local max_id = redis.call("ZREVRANGEBYSCORE", ZKEY, a.max, a.min, "LIMIT", 0, 1)
+	if #min_id == 1 and #max_id == 1 then
+		local min_rk = redis.call("ZRANK", ZKEY, min_id[1])
+		local max_rk = redis.call("ZRANK", ZKEY, max_id[1])
+		if max_rk - min_rk + 1 <= a.count then
+			local x = redis.call("ZRANGE", ZKEY, min_rk, max_rk)
+			for i=1, #x do r[#r+1] = x[i] end
+		else
+		    math.randomseed(redis.call("TIME")[2])
+			local u = {}
+			for i=1,a.count do
+			    local rk = 0
+			    repeat rk = math.random(min_rk, max_rk) until not u[rk]
+				u[rk] = 1
+				r[#r+1] = redis.call("ZRANGE", ZKEY, rk, rk)[1]
+			end
+		end
+	end
+end
 return cmsgpack.pack(r)`)
 
 	// O(M)

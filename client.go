@@ -1,11 +1,15 @@
 package ranking
 
+import (
+	"github.com/ntons/redis"
+)
+
 type Client struct {
-	client RedisClient
+	client redis.Client
 	opts   []Option
 }
 
-func New(client RedisClient, opts ...Option) Client {
+func New(client redis.Client, opts ...Option) Client {
 	return Client{client: client, opts: opts}
 }
 

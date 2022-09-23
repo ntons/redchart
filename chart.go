@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/ntons/redis"
 	"github.com/vmihailenco/msgpack/v4"
 )
 
@@ -22,12 +22,12 @@ func (e Entry) String() string {
 type E = Entry
 
 type chart struct {
-	client RedisClient
+	client redis.Client
 	name   string
 	opts   string
 }
 
-func getChart(client RedisClient, name string, opts ...Option) chart {
+func getChart(client redis.Client, name string, opts ...Option) chart {
 	var o options
 	for _, opt := range opts {
 		opt.apply(&o)
@@ -92,13 +92,13 @@ func (x chart) SetInfo(ctx context.Context, entries ...*Entry) (err error) {
 // i don't think you should remove entry by range
 
 func (x chart) runScript(
-	ctx context.Context, script *script, args ...interface{}) *redis.Cmd {
+	ctx context.Context, script *redis.Script, args ...interface{}) *redis.Cmd {
 	args = append([]interface{}{x.opts}, args...)
 	return script.Run(ctx, x.client, []string{x.name}, args...)
 }
 
 func (x chart) runScriptString(
-	ctx context.Context, script *script, args ...string) *redis.Cmd {
+	ctx context.Context, script *redis.Script, args ...string) *redis.Cmd {
 	tmp := make([]interface{}, 0, len(args))
 	for _, arg := range args {
 		tmp = append(tmp, arg)
