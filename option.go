@@ -10,6 +10,8 @@ import (
 type options struct {
 	// capacity of chart
 	Capacity int32 `msgpack:"capacity,omitempty"`
+	// do not trim if exceed capacity
+	NotTrim bool `msgpack:"not_trim"`
 	// duplicate from name IF NOT EXIST
 	ConstructFrom string `msgpack:"construct_from,omitempty"`
 	// only one of ExpireAt and IdleExpire should be specified,
@@ -43,6 +45,9 @@ func (f funcOption) apply(o *options) {
 
 func WithCapacity(capacity int32) Option {
 	return funcOption{func(o *options) { o.Capacity = capacity }}
+}
+func WithNotTrim() Option {
+	return funcOption{func(o *options) { o.NotTrim = true }}
 }
 func WithConstructFrom(name string) Option {
 	return funcOption{func(o *options) { o.ConstructFrom = name }}

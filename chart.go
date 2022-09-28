@@ -41,9 +41,9 @@ func (x chart) Touch(ctx context.Context) (err error) {
 }
 
 // get entries by range
-func (x chart) GetRange(
+func (x chart) GetByRank(
 	ctx context.Context, offset, count int32) (entries []*Entry, err error) {
-	s, err := x.runScript(ctx, luaGetRange, offset, offset+count-1).Text()
+	s, err := x.runScript(ctx, luaGetByRank, offset, offset+count-1).Text()
 	if err != nil {
 		return
 	}

@@ -16,6 +16,18 @@ func GetLeaderboard(r redis.Client, name string, opts ...Option) Leaderboard {
 	return Leaderboard{getChart(r, name, opts...)}
 }
 
+func (x Leaderboard) handleRet(ret int) (err error) {
+	if ret < 0 {
+		switch ret {
+		case -1:
+			err = ErrChartFull
+		default:
+			err = fmt.Errorf("error code: %d", ret)
+		}
+	}
+	return
+}
+
 // add entries which not exist to chart
 func (x Leaderboard) Add(
 	ctx context.Context, entries ...*Entry) (err error) {
@@ -23,7 +35,11 @@ func (x Leaderboard) Add(
 	if err != nil {
 		return
 	}
-	return x.runScript(ctx, luaAdd, b2s(b)).Err()
+	ret, err := x.runScript(ctx, luaAdd, b2s(b)).Int()
+	if err != nil {
+		return
+	}
+	return x.handleRet(ret)
 }
 
 // update score or add, e.Rank will be ignored
@@ -33,7 +49,11 @@ func (x Leaderboard) Set(
 	if err != nil {
 		return
 	}
-	return x.runScript(ctx, luaSet, b2s(b)).Err()
+	ret, err := x.runScript(ctx, luaSet, b2s(b)).Int()
+	if err != nil {
+		return
+	}
+	return x.handleRet(ret)
 }
 
 // update score by increment, e.Rank will be ignored

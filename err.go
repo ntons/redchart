@@ -5,6 +5,5 @@ import (
 )
 
 var (
-	ErrNameExist    = errors.New("name exist")
-	ErrNameNotExist = errors.New("name not exist")
+	ErrChartFull = errors.New("chart full")
 )

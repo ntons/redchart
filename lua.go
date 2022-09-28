@@ -9,8 +9,8 @@ func newScript(src string) *redis.Script {
 const (
 	luaTemplate = `
 local ZKEY, HKEY = KEYS[1]..":z", KEYS[1]..":h"
-local f = function() %s end
 local o = cmsgpack.unpack(table.remove(ARGV, 1))
+local f = function() %s end
 if o then
 	if o.construct_from and redis.call("EXISTS", ZKEY) == 0 and
 		redis.call("EXISTS", o.construct_from..":z") == 1 then
@@ -19,7 +19,7 @@ if o then
 		if #v > 0 then redis.call("HMSET", HKEY, unpack(v)) end
 	end
 	local r = f()
-	if o.capacity then
+	if o.capacity and o.capacity > 0 then
 		local size = redis.call("ZCARD", ZKEY)
 		if size > o.capacity then
 			local v = redis.call("ZPOPMIN", ZKEY, size - o.capacity)
@@ -57,32 +57,30 @@ return redis.call("ZREM", ZKEY, unpack(ARGV))`)
 
 	// O(M*log(N))
 	luaAdd = newScript(`
-local es = cmsgpack.unpack(ARGV[1])
-if #es == 0 then return 0 end
-local za = {}
-local ha = {}
-for _, e in ipairs(es) do
-	za[#za+1], za[#za+2] = e.score, e.id
-	if e.info and e.info ~= "" then
-		ha[#ha+1], ha[#ha+2] = e.id, e.info
-	end
+local elist = cmsgpack.unpack(ARGV[1])
+if #elist == 0 then return 0 end
+local zargs, hargs, count = {}, {}, 0
+for _, e in ipairs(elist) do
+	if o and o.capacity and o.capacity > 0 and o.not_trim and not redis.call("ZSCORE", ZKEY, e.id) then count = count + 1 end
+	zargs[#zargs+1], zargs[#zargs+2] = e.score, e.id
+	if e.info and e.info ~= "" then hargs[#hargs+1], hargs[#hargs+2] = e.id, e.info end
 end
-if #ha > 0 then redis.call("HSET", HKEY, unpack(ha)) end
-return redis.call("ZADD", ZKEY, "NX", unpack(za))`)
+if o and o.capacity and o.capacity > 0 and redis.call("ZCARD", ZKEY) + count > o.capacity then return -1 end
+if #hargs > 0 then redis.call("HSET", HKEY, unpack(hargs)) end
+return redis.call("ZADD", ZKEY, "NX", unpack(zargs))`)
 
 	// O(M*log(N))
 	luaSet = newScript(`
-local es = cmsgpack.unpack(ARGV[1])
-if #es == 0 then return 0 end
-local za = {}
-local ha = {}
-for _, e in ipairs(es) do
-	za[#za+1], za[#za+2] = e.score, e.id
-	if e.info and e.info ~= "" then
-		ha[#ha+1], ha[#ha+2] = e.id, e.info
-	end
+local elist = cmsgpack.unpack(ARGV[1])
+if #elist == 0 then return 0 end
+local zargs, hargs, count = {}, {}, 0
+for _, e in ipairs(elist) do
+	if o and o.capacity and o.capacity > 0 and o.not_trim and not redis.call("ZSCORE", ZKEY, e.id) then count = count + 1 end
+	zargs[#zargs+1], zargs[#zargs+2] = e.score, e.id
+	if e.info and e.info ~= "" then hargs[#hargs+1], hargs[#hargs+2] = e.id, e.info end
 end
-if #ha > 0 then redis.call("HSET", HKEY, unpack(ha)) end
+if o and o.capacity and o.capacity > 0 and redis.call("ZCARD", ZKEY) + count > o.capacity then return -1 end
+if #hargs > 0 then redis.call("HSET", HKEY, unpack(hargs)) end
 return redis.call("ZADD", ZKEY, unpack(za))`)
 
 	// O(M*log(N))
@@ -135,7 +133,7 @@ for _, e in ipairs(es) do a[#a+1], a[#a+2] = e.id, e.info end
 return redis.call("HSET", HKEY, unpack(a))`)
 
 	// O(log(N)+M)
-	luaGetRange = newScript(`
+	luaGetByRank = newScript(`
 local es = {}
 local r = redis.call("ZREVRANGE", ZKEY, ARGV[1], ARGV[2], "WITHSCORES")
 if #r == 0 then return cmsgpack.pack(es) end
