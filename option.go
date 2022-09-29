@@ -14,6 +14,9 @@ type options struct {
 	NotTrim bool `msgpack:"not_trim"`
 	// duplicate from name IF NOT EXIST
 	ConstructFrom string `msgpack:"construct_from,omitempty"`
+	// not expire is the default behavious,
+	// this is used to unset blowing expiration options
+	NotExpire bool `msgpack:"not_expire,omitempty"`
 	// only one of ExpireAt and IdleExpire should be specified,
 	// If both were set, ExpireAt was prefered
 	ExpireAt   string `msgpack:"expire_at,omitempty"`
@@ -52,6 +55,11 @@ func WithNotTrim() Option {
 func WithConstructFrom(name string) Option {
 	return funcOption{func(o *options) { o.ConstructFrom = name }}
 }
+func WithNotExpire() Option {
+	return funcOption{func(o *options) {
+		o.NotExpire = true
+	}}
+}
 func WithExpireAt(t time.Time) Option {
 	return funcOption{func(o *options) {
 		if t.IsZero() {
@@ -63,7 +71,7 @@ func WithExpireAt(t time.Time) Option {
 }
 func WithIdleExpire(d time.Duration) Option {
 	return funcOption{func(o *options) {
-		if d == 0 {
+		if d <= 0 {
 			o.IdleExpire = ""
 		} else {
 			o.IdleExpire = fmt.Sprintf("%d", d/time.Millisecond)

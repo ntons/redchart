@@ -44,8 +44,13 @@ func TestLeaderboardCapacity(t *testing.T) {
 
 	cli.Del(ctx, "*")
 
-	//lb := GetLeaderboard(cli, "leaderboardtest", WithIdleExpire(time.Minute), WithCapacity(3))
-	lb := GetLeaderboard(cli, "leaderboardtest", WithIdleExpire(time.Minute), WithCapacity(3), WithNotTrim())
+	lb := GetLeaderboard(
+		cli,
+		"leaderboardtest",
+		WithIdleExpire(time.Minute),
+		WithCapacity(3),
+		WithNotTrim(),
+	)
 
 	for i := int64(1); i <= 10; i++ {
 		s := fmt.Sprintf("%d", i)

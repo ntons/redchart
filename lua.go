@@ -19,7 +19,7 @@ if o then
 		if #v > 0 then redis.call("HMSET", HKEY, unpack(v)) end
 	end
 	local r = f()
-	if o.capacity and o.capacity > 0 then
+	if o.capacity and o.capacity > 0 and not o.not_trim then
 		local size = redis.call("ZCARD", ZKEY)
 		if size > o.capacity then
 			local v = redis.call("ZPOPMIN", ZKEY, size - o.capacity)
@@ -28,15 +28,15 @@ if o then
 			redis.call("HDEL", HKEY, unpack(a))
 		end
 	end
-	if o.expire_at then
+	if o.not_expire then
+		redis.call("PERSIST", ZKEY)
+		redis.call("PERSIST", HKEY)
+	elseif o.expire_at then
 		redis.call("PEXPIREAT", ZKEY, o.expire_at)
 		redis.call("PEXPIREAT", HKEY, o.expire_at)
 	elseif o.idle_expire then
 		redis.call("PEXPIRE", ZKEY, o.idle_expire)
 		redis.call("PEXPIRE", HKEY, o.idle_expire)
-	else
-		redis.call("PERSIST", ZKEY)
-		redis.call("PERSIST", HKEY)
 	end
 	return r
 else
