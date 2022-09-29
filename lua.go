@@ -81,7 +81,7 @@ for _, e in ipairs(elist) do
 end
 if o and o.capacity and o.capacity > 0 and redis.call("ZCARD", ZKEY) + count > o.capacity then return -1 end
 if #hargs > 0 then redis.call("HSET", HKEY, unpack(hargs)) end
-return redis.call("ZADD", ZKEY, unpack(za))`)
+return redis.call("ZADD", ZKEY, unpack(zargs))`)
 
 	// O(M*log(N))
 	luaIncr = newScript(`
