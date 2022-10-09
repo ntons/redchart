@@ -16,7 +16,7 @@ type Entry struct {
 }
 
 func (e Entry) String() string {
-	return fmt.Sprintf("%v,%v,%v", e.Rank, e.Id, e.Score)
+	return fmt.Sprintf("%v,%v,%v,%v", e.Rank, e.Id, e.Score, e.Info)
 }
 
 type E = Entry

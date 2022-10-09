@@ -134,35 +134,32 @@ return redis.call("HSET", HKEY, unpack(a))`)
 
 	// O(log(N)+M)
 	luaGetByRank = newScript(`
-local es = {}
-local r = redis.call("ZREVRANGE", ZKEY, ARGV[1], ARGV[2], "WITHSCORES")
-if #r == 0 then return cmsgpack.pack(es) end
+local r = {}
+local x = redis.call("ZREVRANGE", ZKEY, ARGV[1], ARGV[2], "WITHSCORES")
 local a = {}
-for i=1,#r-1,2 do
-	es[#es + 1] = { ["id"] = r[i], ["score"] = tonumber(r[i+1]) }
-	a[#a + 1] = r[i]
+for i=1,#x-1,2 do
+	r[#r+1] = { ["rank"] = ARGV[1] + #r, ["id"] = x[i], ["score"] = tonumber(x[i+1]) }
+	a[#a+1] = x[i]
 end
-local r = redis.call("HMGET", HKEY, unpack(a))
-for i=1,#r,1 do
-	es[i].rank = ARGV[1] + i - 1
-	if r[i] then es[i].info = r[i] end
+if #a > 0 and not o.no_info then
+	local x = redis.call("HMGET", HKEY, unpack(a))
+	for i=1,#x,1 do if x[i] then r[i].info = x[i] end end
 end
-return cmsgpack.pack(es)`)
+return cmsgpack.pack(r)`)
 
 	// O(M*log(N))
+	// first ZSCORE[O(1)], then ZREVRANK[O(logN)]
 	luaGetById = newScript(`
-local es = {}
+local r = {}
 for _, id in ipairs(ARGV) do
-	local e = { ["id"] = id }
-	e.rank = redis.call("ZREVRANK", ZKEY, id)
-	if e.rank then
-		e.score = assert(tonumber(redis.call("ZSCORE", ZKEY, id)))
-		e.info = redis.call("HGET", HKEY, id)
-		if not e.info then e.info = nil end
-		es[#es+1] = e
+    local x = redis.call("ZSCORE", ZKEY, id)
+	if x then
+		local e = { ["id"] = id, ["score"] = tonumber(x), ["rank"] = redis.call("ZREVRANK", ZKEY, id) }
+	    if not o.no_info then e.info = redis.call("HGET", HKEY, id) end
+		r[#r+1] = e
 	end
 end
-return cmsgpack.pack(es)`)
+return cmsgpack.pack(r)`)
 
 	// bubble
 	// O(M*log(N))

@@ -21,6 +21,8 @@ type options struct {
 	// If both were set, ExpireAt was prefered
 	ExpireAt   string `msgpack:"expire_at,omitempty"`
 	IdleExpire string `msgpack:"idle_expire,omitempty"`
+	// query chart with no info return(only rank/id/score)
+	NoInfo bool `msgpack:"no_info,omitempty"`
 }
 
 func (o *options) encode() string {
@@ -77,4 +79,7 @@ func WithIdleExpire(d time.Duration) Option {
 			o.IdleExpire = fmt.Sprintf("%d", d/time.Millisecond)
 		}
 	}}
+}
+func WithNoInfo() Option {
+	return funcOption{func(o *options) { o.NoInfo = true }}
 }

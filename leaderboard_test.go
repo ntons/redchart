@@ -48,11 +48,12 @@ func TestLeaderboardCapacity(t *testing.T) {
 		cli,
 		"leaderboardtest",
 		WithIdleExpire(time.Minute),
-		WithCapacity(3),
-		WithNotTrim(),
+		WithCapacity(10),
+		WithNoInfo(),
+		//WithNotTrim(),
 	)
 
-	for i := int64(1); i <= 10; i++ {
+	for i := int64(1); i <= 100; i++ {
 		s := fmt.Sprintf("%d", i)
 		if err := lb.Add(ctx, &Entry{Id: s, Info: s, Score: i}); err != nil {
 			fmt.Printf("failed to add: %v\n", err)
@@ -60,11 +61,29 @@ func TestLeaderboardCapacity(t *testing.T) {
 		}
 	}
 
-	r, err := lb.GetByRank(ctx, 0, 10)
-	if err != nil {
-		fmt.Printf("failed to rand: %v\n", err)
-		return
+	{
+		r, err := lb.GetByRank(ctx, 0, 3)
+		if err != nil {
+			fmt.Printf("failed to rand: %v\n", err)
+			return
+		}
+		fmt.Println(r)
+	}
+	{
+		r, err := lb.GetByRank(ctx, 3, 6)
+		if err != nil {
+			fmt.Printf("failed to rand: %v\n", err)
+			return
+		}
+		fmt.Println(r)
 	}
 
-	fmt.Println(r)
+	{
+		r, err := lb.GetById(ctx, "99", "91", "80")
+		if err != nil {
+			fmt.Printf("failed to rand: %v\n", err)
+			return
+		}
+		fmt.Println(r)
+	}
 }
