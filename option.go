@@ -1,4 +1,4 @@
-package ranking
+package redchart
 
 import (
 	"fmt"

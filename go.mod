@@ -1,4 +1,4 @@
-module github.com/ntons/ranking
+module github.com/ntons/redchart
 
 go 1.18
 

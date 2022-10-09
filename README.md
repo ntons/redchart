@@ -1,4 +1,4 @@
-# ranking based on redis
+# ranking charts based on redis
 
 ## Leaderboard
 
