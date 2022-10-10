@@ -12,8 +12,8 @@ type Leaderboard struct {
 	chart
 }
 
-func GetLeaderboard(r redis.Client, name string, opts ...Option) Leaderboard {
-	return Leaderboard{getChart(r, name, opts...)}
+func GetLeaderboard(rcli redis.Client, name string, opts ...Option) Leaderboard {
+	return Leaderboard{getChart(rcli, name, applyOptions(opts))}
 }
 
 func (x Leaderboard) handleRet(ret int) (err error) {

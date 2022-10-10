@@ -17,7 +17,7 @@ func TestLeaderboardRandomByScore(t *testing.T) {
 
 	cli.Del(ctx, "*")
 
-	lb := GetLeaderboard(cli, "leaderboardtest", WithIdleExpire(time.Minute))
+	lb := GetLeaderboard(cli, "leaderboardtest", WithExpire(time.Minute))
 
 	for i := 1; i <= 10; i++ {
 		n := rand.Int63n(100)
@@ -47,7 +47,7 @@ func TestLeaderboardCapacity(t *testing.T) {
 	lb := GetLeaderboard(
 		cli,
 		"leaderboardtest",
-		WithIdleExpire(time.Minute),
+		WithExpire(time.Minute),
 		WithCapacity(10),
 		WithNoInfo(),
 		//WithNotTrim(),

@@ -22,17 +22,13 @@ func (e Entry) String() string {
 type E = Entry
 
 type chart struct {
-	client redis.Client
-	name   string
-	opts   string
+	rcli redis.Client
+	name string
+	opts string
 }
 
-func getChart(client redis.Client, name string, opts ...Option) chart {
-	var o options
-	for _, opt := range opts {
-		opt.apply(&o)
-	}
-	return chart{client: client, name: name, opts: o.encode()}
+func getChart(rcli redis.Client, name, opts string) chart {
+	return chart{rcli: rcli, name: name, opts: opts}
 }
 
 // Touch modify metadata over chart options
@@ -94,7 +90,7 @@ func (x chart) SetInfo(ctx context.Context, entries ...*Entry) (err error) {
 func (x chart) runScript(
 	ctx context.Context, script *redis.Script, args ...interface{}) *redis.Cmd {
 	args = append([]interface{}{x.opts}, args...)
-	return script.Run(ctx, x.client, []string{x.name}, args...)
+	return script.Run(ctx, x.rcli, []string{x.name}, args...)
 }
 
 func (x chart) runScriptString(

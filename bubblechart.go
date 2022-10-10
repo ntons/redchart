@@ -11,8 +11,8 @@ type BubbleChart struct {
 	chart
 }
 
-func GetBubbleChart(r redis.Client, name string, opts ...Option) BubbleChart {
-	return BubbleChart{getChart(r, name, opts...)}
+func GetBubbleChart(rcli redis.Client, name string, opts ...Option) BubbleChart {
+	return BubbleChart{getChart(rcli, name, applyOptions(opts))}
 }
 
 // append entries to the end of chart

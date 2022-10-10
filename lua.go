@@ -12,14 +12,15 @@ local ZKEY, HKEY = KEYS[1]..":z", KEYS[1]..":h"
 local o = cmsgpack.unpack(table.remove(ARGV, 1))
 local f = function() %s end
 if o then
-	if o.construct_from and redis.call("EXISTS", ZKEY) == 0 and
-		redis.call("EXISTS", o.construct_from..":z") == 1 then
+	if o.construct_from and redis.call("EXISTS", ZKEY) == 0 and redis.call("EXISTS", o.construct_from..":z") == 1 then
 		redis.call("ZUNIONSTORE", ZKEY, 1, o.construct_from..":z")
-		local v = redis.call("HGETALL", o.construct_from..":h")
-		if #v > 0 then redis.call("HMSET", HKEY, unpack(v)) end
+		if not o.no_info then
+			local v = redis.call("HGETALL", o.construct_from..":h")
+			if #v > 0 then redis.call("HMSET", HKEY, unpack(v)) end
+		end
 	end
 	local r = f()
-	if o.capacity and o.capacity > 0 and not o.not_trim then
+	if o.capacity and o.capacity > 0 and not o.no_trim then
 		local size = redis.call("ZCARD", ZKEY)
 		if size > o.capacity then
 			local v = redis.call("ZPOPMIN", ZKEY, size - o.capacity)
@@ -28,15 +29,15 @@ if o then
 			redis.call("HDEL", HKEY, unpack(a))
 		end
 	end
-	if o.not_expire then
+	if o.persist then
 		redis.call("PERSIST", ZKEY)
 		redis.call("PERSIST", HKEY)
 	elseif o.expire_at then
-		redis.call("PEXPIREAT", ZKEY, o.expire_at)
-		redis.call("PEXPIREAT", HKEY, o.expire_at)
+		redis.call("EXPIREAT", ZKEY, o.expire_at)
+		redis.call("EXPIREAT", HKEY, o.expire_at)
 	elseif o.idle_expire then
-		redis.call("PEXPIRE", ZKEY, o.idle_expire)
-		redis.call("PEXPIRE", HKEY, o.idle_expire)
+		redis.call("EXPIRE", ZKEY, o.idle_expire)
+		redis.call("EXPIRE", HKEY, o.idle_expire)
 	end
 	return r
 else
@@ -61,7 +62,7 @@ local elist = cmsgpack.unpack(ARGV[1])
 if #elist == 0 then return 0 end
 local zargs, hargs, count = {}, {}, 0
 for _, e in ipairs(elist) do
-	if o and o.capacity and o.capacity > 0 and o.not_trim and not redis.call("ZSCORE", ZKEY, e.id) then count = count + 1 end
+	if o and o.capacity and o.capacity > 0 and o.no_trim and not redis.call("ZSCORE", ZKEY, e.id) then count = count + 1 end
 	zargs[#zargs+1], zargs[#zargs+2] = e.score, e.id
 	if e.info and e.info ~= "" then hargs[#hargs+1], hargs[#hargs+2] = e.id, e.info end
 end
@@ -75,7 +76,7 @@ local elist = cmsgpack.unpack(ARGV[1])
 if #elist == 0 then return 0 end
 local zargs, hargs, count = {}, {}, 0
 for _, e in ipairs(elist) do
-	if o and o.capacity and o.capacity > 0 and o.not_trim and not redis.call("ZSCORE", ZKEY, e.id) then count = count + 1 end
+	if o and o.capacity and o.capacity > 0 and o.no_trim and not redis.call("ZSCORE", ZKEY, e.id) then count = count + 1 end
 	zargs[#zargs+1], zargs[#zargs+2] = e.score, e.id
 	if e.info and e.info ~= "" then hargs[#hargs+1], hargs[#hargs+2] = e.id, e.info end
 end

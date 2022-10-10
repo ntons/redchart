@@ -5,18 +5,17 @@ import (
 )
 
 type Client struct {
-	client redis.Client
-	opts   []Option
+	rcli redis.Client
 }
 
-func New(client redis.Client, opts ...Option) Client {
-	return Client{client: client, opts: opts}
+func New(rcli redis.Client) Client {
+	return Client{rcli: rcli}
 }
 
-func (c Client) GetLeaderboard(name string, opts ...Option) Leaderboard {
-	return GetLeaderboard(c.client, name, append(c.opts, opts...)...)
+func (cli Client) GetLeaderboard(name string, opts ...Option) Leaderboard {
+	return GetLeaderboard(cli.rcli, name, opts...)
 }
 
-func (c Client) GetBubbleChart(name string, opts ...Option) BubbleChart {
-	return GetBubbleChart(c.client, name, append(c.opts, opts...)...)
+func (cli Client) GetBubbleChart(name string, opts ...Option) BubbleChart {
+	return GetBubbleChart(cli.rcli, name, opts...)
 }
