@@ -92,9 +92,7 @@ local a = {}
 local r = {}
 for i, e in ipairs(es) do
 	r[i] = tonumber(redis.call("ZADD", ZKEY, "INCR", e.score, e.id))
-	if e.info and e.info ~= "" then
-		a[#a+1], a[#a+2] = e.id, e.info
-	end
+	if e.info and e.info ~= "" then a[#a+1], a[#a+2] = e.id, e.info end
 end
 if #a > 0 then redis.call("HSET", HKEY, unpack(a)) end
 return cmsgpack.pack(r)`)
@@ -156,7 +154,10 @@ for _, id in ipairs(ARGV) do
     local x = redis.call("ZSCORE", ZKEY, id)
 	if x then
 		local e = { ["id"] = id, ["score"] = tonumber(x), ["rank"] = redis.call("ZREVRANK", ZKEY, id) }
-	    if not o.no_info then e.info = redis.call("HGET", HKEY, id) end
+	    if not o.no_info then
+			local info = redis.call("HGET", HKEY, id)
+			if info then e.info = info end
+		end
 		r[#r+1] = e
 	end
 end
@@ -176,9 +177,7 @@ for _, e in ipairs(es) do
 	if not redis.call("ZSCORE", ZKEY, e.id) then
 		n = n - 1
 		za[#za+1], za[#za+2] = n, e.id
-		if e.info and e.info ~= "" then
-			ha[#ha+1], ha[#ha+2] = e.id, e.info
-		end
+		if e.info and e.info ~= "" then ha[#ha+1], ha[#ha+2] = e.id, e.info end
 	end
 end
 if #za == 0 then return 0 end

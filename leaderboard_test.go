@@ -49,7 +49,7 @@ func TestLeaderboardCapacity(t *testing.T) {
 		"leaderboardtest",
 		WithExpire(time.Minute),
 		WithCapacity(10),
-		WithNoInfo(),
+		//WithNoInfo(),
 		//WithNotTrim(),
 	)
 
@@ -82,6 +82,55 @@ func TestLeaderboardCapacity(t *testing.T) {
 		r, err := lb.GetById(ctx, "99", "91", "80")
 		if err != nil {
 			fmt.Printf("failed to rand: %v\n", err)
+			return
+		}
+		fmt.Println(r)
+	}
+
+	{
+		r, err := lb.GetById(ctx, "80")
+		if err != nil {
+			fmt.Printf("failed to rand: %v\n", err)
+			return
+		}
+		fmt.Println(r)
+	}
+}
+
+func TestLeaderboardGetById(t *testing.T) {
+	ctx := context.Background()
+
+	cli := redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379", DB: 9})
+
+	cli.Del(ctx, "*")
+
+	lb := GetLeaderboard(
+		cli,
+		"leaderboardtest",
+		WithExpire(time.Minute),
+		WithCapacity(10),
+		//WithNoInfo(),
+		//WithNotTrim(),
+	)
+
+	if err := lb.Add(ctx, &Entry{Id: "1", Score: 1}); err != nil {
+		fmt.Printf("failed to add: %v\n", err)
+		return
+	}
+
+	{
+		r, err := lb.GetById(ctx, "1")
+		if err != nil {
+			fmt.Printf("failed to get: %v\n", err)
+			return
+		}
+		fmt.Println(r)
+	}
+
+	{
+		r, err := lb.GetById(ctx, "2")
+		if err != nil {
+			fmt.Printf("failed to get: %v\n", err)
 			return
 		}
 		fmt.Println(r)
