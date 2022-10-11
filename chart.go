@@ -33,7 +33,10 @@ func getChart(rcli redis.Client, name, opts string) chart {
 
 // Touch modify metadata over chart options
 func (x chart) Touch(ctx context.Context) (err error) {
-	return x.runScript(ctx, luaTouch).Err()
+	if err = x.runScript(ctx, luaTouch).Err(); err == redis.Nil {
+		err = nil
+	}
+	return
 }
 
 // get entries by range
