@@ -57,32 +57,52 @@ return redis.call("ZREM", ZKEY, unpack(ARGV))`)
 	/// leaderboard
 
 	// O(M*log(N))
-	luaAdd = newScript(`
-local elist = cmsgpack.unpack(ARGV[1])
-if #elist == 0 then return 0 end
-local zargs, hargs, count = {}, {}, 0
-for _, e in ipairs(elist) do
-	if o and o.capacity and o.capacity > 0 and o.no_trim and not redis.call("ZSCORE", ZKEY, e.id) then count = count + 1 end
-	zargs[#zargs+1], zargs[#zargs+2] = e.score, e.id
-	if e.info and e.info ~= "" then hargs[#hargs+1], hargs[#hargs+2] = e.id, e.info end
-end
-if o and o.capacity and o.capacity > 0 and redis.call("ZCARD", ZKEY) + count > o.capacity then return -1 end
-if #hargs > 0 then redis.call("HSET", HKEY, unpack(hargs)) end
-return redis.call("ZADD", ZKEY, "NX", unpack(zargs))`)
-
-	// O(M*log(N))
 	luaSet = newScript(`
 local elist = cmsgpack.unpack(ARGV[1])
-if #elist == 0 then return 0 end
-local zargs, hargs, count = {}, {}, 0
-for _, e in ipairs(elist) do
-	if o and o.capacity and o.capacity > 0 and o.no_trim and not redis.call("ZSCORE", ZKEY, e.id) then count = count + 1 end
-	zargs[#zargs+1], zargs[#zargs+2] = e.score, e.id
-	if e.info and e.info ~= "" then hargs[#hargs+1], hargs[#hargs+2] = e.id, e.info end
+if #elist == 0 then return cmsgpack.pack(elist) end
+
+local zargs = {}
+if o and o.set then
+	if o.set.only_add then zargs[#zargs+1] = "NX" end
+	if o.set.only_update then zargs[#zargs+1] = "XX" end
+	if o.set.incr_by then zargs[#zargs+1] = "INCR" end
 end
-if o and o.capacity and o.capacity > 0 and redis.call("ZCARD", ZKEY) + count > o.capacity then return -1 end
-if #hargs > 0 then redis.call("HSET", HKEY, unpack(hargs)) end
-return redis.call("ZADD", ZKEY, unpack(zargs))`)
+local zoptn = #zargs
+
+-- 更新榜单
+local function update(e)
+	if o and o.capacity and o.capacity > 0 and o.no_trim and redis.call("ZCARD", ZKEY) >= o.capacity and not redis.call("ZSCORE", ZKEY, e.id) then e.rank, e.score = -1, 0 return end
+	zargs[zoptn+1], zargs[zoptn+2], e.rank = e.score, e.id, -2
+	redis.call("ZADD", ZKEY, unpack(zargs))
+end
+for _, e in ipairs(elist) do update(e) end
+
+-- 获取更新后榜单
+local function retrieve(e)
+	if e.rank == -1 then return end
+	local score = redis.call("ZSCORE", ZKEY, e.id)
+	if not score then e.rank, e.score = -1, 0 return end
+	local rank = redis.call("ZREVRANK", ZKEY, e.id)
+	if o and o.capacity and o.capacity > 0 and rank >= o.capacity then e.rank, e.score = -1, 0 return end
+	e.score, e.rank = tonumber(score), rank
+end
+for _, e in ipairs(elist) do retrieve(e) end
+
+-- 设置详细信息
+local function update_info(e)
+	if e.rank < 0 then e.info = nil return end
+	if e.info and e.info ~= "" then
+		redis.call("HSET", HKEY, e.id, e.info)
+		if o.no_info then e.info = nil end
+	elseif not o.no_info then
+		local info = redis.call("HGET", HKEY, e.id)
+		if info then e.info = info end
+	end
+end
+for _, e in ipairs(elist) do update_info(e) end
+
+-- 返回更新后数据
+return cmsgpack.pack(elist)`)
 
 	// O(M*log(N))
 	luaIncr = newScript(`
