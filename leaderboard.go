@@ -49,7 +49,7 @@ type RandByScoreArg struct {
 
 // get entries randomly by score
 func (x Leaderboard) RandByScore(
-	ctx context.Context, args RandByScoreArg, opts ...Option) (entries []Entry, err error) {
+	ctx context.Context, args []RandByScoreArg, opts ...Option) (entries []Entry, err error) {
 	b, err := msgpack.Marshal(args)
 	if err != nil {
 		return
