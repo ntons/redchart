@@ -10,7 +10,7 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
-func getTestLeaderboard(ctx context.Context, opts ...Option) Leaderboard {
+func getTestLeaderboard(ctx context.Context) Leaderboard {
 	const name = "leaderboardtest"
 
 	cli := redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379", DB: 9})
@@ -73,162 +73,56 @@ func TestLeaderboardSet(t *testing.T) {
 func TestLeaderboardCapacity(t *testing.T) {
 	ctx := context.Background()
 
-	cli := redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379", DB: 9})
-
-	cli.Del(ctx, "*")
-
-	lb := GetLeaderboard(
-		cli,
-		"leaderboardtest",
-		WithExpire(time.Minute),
-		WithCapacity(10),
-		//WithNoInfo(),
-		//WithNotTrim(),
-	)
-
-	elist := make([]Entry, 0)
-	for i := int64(1); i <= 100; i++ {
-		s := fmt.Sprintf("%d", i)
-		elist = append(elist, Entry{Id: s, Info: s, Score: i})
-	}
-
-	{
-		r, err := lb.Set(ctx, elist, WithSetOnlyAdd(true))
-		if err != nil {
-			fmt.Printf("failed to add: %v\n", err)
-			return
-		}
-		fmt.Println(r)
-	}
-
-	{
-		r, err := lb.GetByRank(ctx, 0, 3)
-		if err != nil {
-			fmt.Printf("failed to rand: %v\n", err)
-			return
-		}
-		fmt.Println(r)
-	}
-	{
-		r, err := lb.GetByRank(ctx, 3, 6)
-		if err != nil {
-			fmt.Printf("failed to rand: %v\n", err)
-			return
-		}
-		fmt.Println(r)
-	}
-
-	{
-		r, err := lb.GetById(ctx, []string{"99", "91", "90", "89", "80"})
-		if err != nil {
-			fmt.Printf("failed to rand: %v\n", err)
-			return
-		}
-		fmt.Println(r)
-	}
-
-	{
-		r, err := lb.GetById(ctx, []string{"80"})
-		if err != nil {
-			fmt.Printf("failed to rand: %v\n", err)
-			return
-		}
-		fmt.Println(r)
-	}
-}
-
-func TestLeaderboardGetById(t *testing.T) {
-	ctx := context.Background()
-
-	lb := getTestLeaderboard(
-		ctx,
-		WithExpire(time.Minute),
-		WithCapacity(10),
-		//WithNoInfo(),
-		//WithNotTrim(),
-	)
-
-	{
-		r, err := lb.SetOne(ctx, Entry{Id: "1", Score: 1}, WithSetOnlyAdd(true))
-		if err != nil {
-			fmt.Printf("failed to add: %v\n", err)
-			return
-		}
-		fmt.Println(r)
-	}
-	{
-		r, err := lb.SetOne(ctx, Entry{Id: "1", Score: 2}, WithSetOnlyAdd(true))
-		if err != nil {
-			fmt.Printf("failed to add: %v\n", err)
-			return
-		}
-		fmt.Println(r)
-	}
-	{
-		r, err := lb.SetOne(ctx, Entry{Id: "1", Score: 2}, WithSetOnlyUpdate(true))
-		if err != nil {
-			fmt.Printf("failed to add: %v\n", err)
-			return
-		}
-		fmt.Println(r)
-	}
-	{
-		r, err := lb.SetOne(ctx, Entry{Id: "1", Score: 3})
-		if err != nil {
-			fmt.Printf("failed to add: %v\n", err)
-			return
-		}
-		fmt.Println(r)
-	}
-	{
-		r, err := lb.SetOne(ctx, Entry{Id: "1", Score: 3}, WithSetIncrBy(true))
-		if err != nil {
-			fmt.Printf("failed to add: %v\n", err)
-			return
-		}
-		fmt.Println(r)
-	}
-
-	{
-		r, err := lb.GetById(ctx, []string{"1"})
-		if err != nil {
-			fmt.Printf("failed to get: %v\n", err)
-			return
-		}
-		fmt.Println(r)
-	}
-
-	{
-		r, err := lb.GetById(ctx, []string{"2"})
-		if err != nil {
-			fmt.Printf("failed to get: %v\n", err)
-			return
-		}
-		fmt.Println(r)
-	}
-}
-
-/*
-func TestLeaderboardRandomByScore(t *testing.T) {
-	ctx := context.Background()
-
 	lb := getTestLeaderboard(ctx)
 
-	for i := 1; i <= 10; i++ {
-		n := rand.Int63n(100)
-		s := fmt.Sprintf("%d", n)
-		if err := lb.Add(ctx, &Entry{Id: s, Info: s, Score: n}); err != nil {
-			fmt.Printf("failed to add: %v\n", err)
-			return
+	// 没有no_trim的情况下，应该每次都能插入进去，但是总长度一直为10
+	for i := int64(1); i <= 20; i++ {
+		r, err := lb.Set(ctx,
+			[]Entry{
+				Entry{Id: fmt.Sprintf("%d", i), Score: i},
+			},
+			WithCapacity(10),
+		)
+		if err != nil {
+			t.Fatalf("failed to set: %v", err)
+		}
+		if len(r) != 1 || r[0].Rank != 0 {
+			t.Fatalf("unexpected set ret: %v", r)
+		}
+	}
+	{
+		r, err := lb.GetByRank(ctx, 0, 100)
+		if err != nil {
+			t.Fatalf("failed to get: %v", err)
+		}
+		if len(r) != 10 {
+			t.Fatalf("unexpected capacity: %v", len(r))
 		}
 	}
 
-	r, err := lb.RandByScore(ctx, RandByScoreArg{Min: 10, Max: 50, Count: 3})
-	if err != nil {
-		fmt.Printf("failed to rand: %v\n", err)
-		return
+	// 有no_trim情况下，超过capacity的新增将返回rank -1
+	for i := int64(21); i <= 30; i++ {
+		r, err := lb.Set(ctx,
+			[]Entry{
+				Entry{Id: fmt.Sprintf("%d", i), Score: i},
+			},
+			WithCapacity(10),
+			WithNoTrim(true),
+		)
+		if err != nil {
+			t.Fatalf("failed to set: %v", err)
+		}
+		if len(r) != 1 || r[0].Rank != -1 {
+			t.Fatalf("unexpected set ret: %v", r)
+		}
 	}
-
-	fmt.Println(r)
+	{
+		r, err := lb.GetByRank(ctx, 0, 100)
+		if err != nil {
+			t.Fatalf("failed to get: %v", err)
+		}
+		if len(r) != 10 {
+			t.Fatalf("unexpected capacity: %v", len(r))
+		}
+	}
 }
-*/
