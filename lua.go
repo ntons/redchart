@@ -59,7 +59,7 @@ return redis.call("ZREM", ZKEY, unpack(ARGV))`)
 	// O(M*log(N))
 	luaSet = newScript(`
 local elist = cmsgpack.unpack(ARGV[1])
-if #elist == 0 then return cmsgpack.pack(elist) end
+if elist == nil or #elist == 0 then return cmsgpack.pack({}) end
 
 local zargs = {}
 if o and o.set then
