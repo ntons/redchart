@@ -28,6 +28,9 @@ func (x chart) Touch(ctx context.Context, opts ...Option) (err error) {
 // get entries by range
 func (x chart) GetByRank(
 	ctx context.Context, offset, count int32, opts ...Option) (entries []Entry, err error) {
+	if count < 1 {
+		return
+	}
 	s, err := x.runScript(ctx, opts, luaGetByRank, offset, offset+count-1).Text()
 	if err != nil {
 		return
